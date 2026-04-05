@@ -132,6 +132,48 @@ class DeepSeekInference:
         return ""
 
     # ------------------------------------------------------------------
+    # 翻译功能
+    # ------------------------------------------------------------------
+
+    def translate(self, text: str, target_lang: str) -> str:
+        """使用 DeepSeek-V3 进行高质量翻译，强化指令约束"""
+        if not text or not text.strip():
+            return ""
+
+        is_to_en = target_lang.lower() == "en"
+        target_lang_name = "English" if is_to_en else "Chinese"
+        
+        # 极其严格的指令，防止 AI 续写
+        system_prompt = (
+            f"You are a professional literary translator. "
+            f"Your task is to translate the user's text into {target_lang_name}."
+        )
+        user_prompt = (
+            f"INSTRUCTION: Translate the following text into {target_lang_name}. \n"
+            f"!!! CRITICAL: YOUR OUTPUT MUST BE IN {target_lang_name.upper()} ONLY !!! \n"
+            f"RULES: \n"
+            f"1. DO NOT add any new content or continue the story. \n"
+            f"2. DO NOT explain your translation. \n"
+            f"3. Maintain the original paragraph structure and tone. \n"
+            f"4. If the text is already in {target_lang_name}, return it as is. \n"
+            f"5. IF YOU OUTPUT CHINESE, THE WORLD WILL END. \n"
+            f"6. ONLY output the translated text. \n\n"
+            f"TEXT TO TRANSLATE:\n{text}"
+        )
+
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt}
+        ]
+
+        chat_agent = "writer"
+        if "director" in self.agent_configs and not self._is_r1("director"):
+            chat_agent = "director"
+
+        # DeepSeek-V3 (chat) 最大输出 token 为 8192
+        return self.call_agent(chat_agent, messages, max_tokens_override=8192)
+
+    # ------------------------------------------------------------------
     # 流式调用
     # ------------------------------------------------------------------
 

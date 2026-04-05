@@ -37,6 +37,14 @@ class StoryDatabase:
     def _session(self) -> Session:
         return self.SessionLocal()
 
+    def _get_project_lang(self, session: Session, project_id: str) -> str:
+        """获取项目的预设创作语言，无则根据模型默认值返回"""
+        project = session.get(Project, project_id)
+        if project and project.output_language:
+            return project.output_language
+        # 最后的兜底，使用模型定义的默认值
+        return "zh"
+
     # ------------------------------------------------------------------
     # Project
     # ------------------------------------------------------------------
@@ -51,6 +59,7 @@ class StoryDatabase:
         style_sample: str = "",
         narrative_person: str = "第三",
         project_id: Optional[str] = None,
+        language: str = "zh",
     ) -> str:
         if project_id is None:
             project_id = str(uuid.uuid4())
@@ -64,6 +73,7 @@ class StoryDatabase:
                 setting_constraints=constraints,
                 setting_style_sample=style_sample,
                 setting_narrative_person=narrative_person,
+                output_language=language,
             )
             s.add(project)
             s.commit()
@@ -94,10 +104,13 @@ class StoryDatabase:
     ) -> str:
         char_id = str(uuid.uuid4())
         with self._session() as s:
+            lang = self._get_project_lang(s, project_id)
+            
             char = Character(
                 id=char_id,
                 project_id=project_id,
                 name=name,
+                lang=lang,
                 role=role,
                 personality=personality,
                 appearance=appearance,
@@ -116,9 +129,10 @@ class StoryDatabase:
 
     def get_all_characters(self, project_id: str) -> list[Character]:
         with self._session() as s:
+            lang = self._get_project_lang(s, project_id)
             chars = (
                 s.query(Character)
-                .filter_by(project_id=project_id)
+                .filter_by(project_id=project_id, lang=lang)
                 .all()
             )
             s.expunge_all()
@@ -162,10 +176,13 @@ class StoryDatabase:
     ) -> str:
         chapter_id = str(uuid.uuid4())
         with self._session() as s:
+            lang = self._get_project_lang(s, project_id)
+            
             chapter = Chapter(
                 id=chapter_id,
                 project_id=project_id,
                 chapter_number=chapter_number,
+                lang=lang,
                 title=title,
                 full_text=full_text,
                 word_count=len(full_text),
@@ -180,9 +197,10 @@ class StoryDatabase:
 
     def get_all_chapters(self, project_id: str) -> list[Chapter]:
         with self._session() as s:
+            lang = self._get_project_lang(s, project_id)
             chapters = (
                 s.query(Chapter)
-                .filter_by(project_id=project_id)
+                .filter_by(project_id=project_id, lang=lang)
                 .order_by(Chapter.chapter_number)
                 .all()
             )
@@ -191,9 +209,10 @@ class StoryDatabase:
 
     def get_chapter(self, project_id: str, chapter_number: int) -> Optional[Chapter]:
         with self._session() as s:
+            lang = self._get_project_lang(s, project_id)
             chapter = (
                 s.query(Chapter)
-                .filter_by(project_id=project_id, chapter_number=chapter_number)
+                .filter_by(project_id=project_id, chapter_number=chapter_number, lang=lang)
                 .first()
             )
             if chapter:
@@ -202,14 +221,16 @@ class StoryDatabase:
 
     def get_chapter_count(self, project_id: str) -> int:
         with self._session() as s:
-            return s.query(Chapter).filter_by(project_id=project_id).count()
+            lang = self._get_project_lang(s, project_id)
+            return s.query(Chapter).filter_by(project_id=project_id, lang=lang).count()
 
     def get_latest_chapter_text(self, project_id: str, char_count: int = 800) -> str:
         """返回最新章节末尾 char_count 字（用于作家的上文衔接）"""
         with self._session() as s:
+            lang = self._get_project_lang(s, project_id)
             chapter = (
                 s.query(Chapter)
-                .filter_by(project_id=project_id)
+                .filter_by(project_id=project_id, lang=lang)
                 .order_by(Chapter.chapter_number.desc())
                 .first()
             )
@@ -294,19 +315,40 @@ class StoryDatabase:
                 return project.current_milestone
             return None
 
-    def update_chapter_text(
-        self, project_id: str, chapter_number: int, new_text: str, new_summary: str = ""
+    def update_chapter_text_full(
+        self,
+        project_id: str,
+        chapter_number: int,
+        new_text: str,
+        new_summary: str = "",
+        new_title: str = "",
+        lang: Optional[str] = None,
     ) -> None:
-        """更新已有章节的正文（导演审查后重写用）"""
+        """更新已有章节的全量信息，若不存在则新建"""
         with self._session() as s:
+            if lang is None:
+                lang = self._get_project_lang(s, project_id)
+                
             chapter = (
                 s.query(Chapter)
-                .filter_by(project_id=project_id, chapter_number=chapter_number)
+                .filter_by(project_id=project_id, chapter_number=chapter_number, lang=lang)
                 .first()
             )
-            if chapter:
+            if not chapter:
+                chapter = Chapter(
+                    id=str(uuid.uuid4()),
+                    project_id=project_id,
+                    chapter_number=chapter_number,
+                    lang=lang,
+                )
+                s.add(chapter)
+
+            if new_text:
                 chapter.full_text = new_text
                 chapter.word_count = len(new_text)
-                if new_summary:
-                    chapter.summary = new_summary
-                s.commit()
+            if new_summary:
+                chapter.summary = new_summary
+            if new_title:
+                chapter.title = new_title
+            
+            s.commit()

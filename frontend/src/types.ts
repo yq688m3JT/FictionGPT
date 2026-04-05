@@ -64,6 +64,7 @@ export interface ProjectCreate {
   constraints: string
   style_sample: string
   narrative_person: string
+  language: string
   characters: CharacterCreate[]
 }
 

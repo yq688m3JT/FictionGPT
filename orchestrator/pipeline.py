@@ -26,9 +26,14 @@ class ChapterPipeline:
 
         self.inference = DeepSeekInference(config)
         self.db = StoryDatabase(config, project_id=project_id)
-        self.director = DirectorAgent(self.inference)
-        self.screenwriter = ScreenwriterAgent(self.inference)
-        self.writer = WriterAgent(self.inference)
+
+        # 获取项目预设语言
+        project = self.db.get_project(project_id)
+        self.output_language = project.output_language if project else "zh"
+
+        self.director = DirectorAgent(self.inference, language=self.output_language)
+        self.screenwriter = ScreenwriterAgent(self.inference, language=self.output_language)
+        self.writer = WriterAgent(self.inference, language=self.output_language)
 
         # 向量存储
         vector_path = config["memory"]["vector_path"].format(project_id=project_id)
@@ -119,17 +124,43 @@ class ChapterPipeline:
         _stage("director", f"\n[导演] 规划第 {chapter_num} 章...")
         plan = self.director.plan_chapter(self.project_id, self.db)
 
-        if "error" in plan or not plan.get("key_scenes"):
-            err_msg = plan.get("error", "JSON解析失败或关键字段缺失")
+        if "error" in plan:
+            err_msg = plan.get("error", "JSON解析失败")
             raw_content = plan.get("raw", "")[:500]
             raise RuntimeError(
                 f"【核心熔断】导演规划阶段失败: {err_msg}\n原始输出: {raw_content}"
             )
 
+        # key_scenes 缺失时自动降级：从 narrative_goal 构造最小场景
+        if not plan.get("key_scenes"):
+            print(
+                f"[警告] 导演规划缺少 key_scenes（已有字段: {list(plan.keys())}），"
+                f"自动构造最小场景",
+                flush=True,
+            )
+            plan["key_scenes"] = [
+                {
+                    "scene_id": f"{chapter_num}-1",
+                    "location": "TBD" if self.output_language == "en" else "待定",
+                    "characters": [],
+                    "conflict": plan.get("narrative_goal", 
+                        "Advance the story" if self.output_language == "en" else "推进故事发展"),
+                    "emotion_arc": "Steady progression" if self.output_language == "en" else "自然推进",
+                    "pacing": "slow" if self.output_language == "en" else "舒缓",
+                }
+            ]
+
         plan["chapter_number"] = chapter_num
-        title = plan.get("chapter_title_hint", f"第{chapter_num}章")
+        fallback_title = f"Chapter {chapter_num}" if self.output_language == "en" else f"第{chapter_num}章"
+        title = plan.get("chapter_title_hint", fallback_title)
         narrative_goal = plan.get("narrative_goal", "")
-        print(f"[导演] 规划完成：第{chapter_num}章《{title}》- {narrative_goal}")
+        
+        msg = (
+            f"[Director] Plan complete: Ch.{chapter_num} \"{title}\" - {narrative_goal}"
+            if self.output_language == "en" else
+            f"[导演] 规划完成：第{chapter_num}章《{title}》- {narrative_goal}"
+        )
+        print(msg)
 
         # ============================================================
         # 阶段3：编剧细化
@@ -151,7 +182,7 @@ class ChapterPipeline:
         # 阶段4：作家写作
         # ============================================================
         writer_ctx = self.context_builder.build_writer_context(
-            self.project_id, plan, outline
+            self.project_id, plan, outline, language=self.output_language
         )
 
         _stage("writer", f"[作家] 开始写作第 {chapter_num} 章...")
@@ -267,7 +298,10 @@ class ChapterPipeline:
 
         prompt_path = Path(__file__).parent.parent / "prompts" / "summarizer.txt"
         template = prompt_path.read_text(encoding="utf-8")
-        prompt = template.replace("{full_text}", full_text[:3000])
+        
+        # 注入语言指令
+        lang_instruction = "IMPORTANT: Output the summary in English." if self.output_language == "en" else "请使用中文输出摘要。"
+        prompt = template.replace("{full_text}", full_text[:3000]) + f"\n\n{lang_instruction}"
 
         messages = [{"role": "user", "content": prompt}]
         try:

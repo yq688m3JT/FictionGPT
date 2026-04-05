@@ -18,6 +18,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from api import generation, projects
+from inference.deepseek_client import DeepSeekInference
 
 # ── 配置加载 ──────────────────────────────────────────────
 with open("config.yaml", encoding="utf-8") as f:
@@ -26,6 +27,7 @@ with open("config.yaml", encoding="utf-8") as f:
 # ── 应用初始化 ────────────────────────────────────────────
 app = FastAPI(title="FictionGPT", version="3.0")
 app.state.config = app_config
+app.state.inference = DeepSeekInference(app_config)
 
 app.add_middleware(
     CORSMiddleware,

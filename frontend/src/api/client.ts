@@ -35,12 +35,14 @@ export const api = {
   getProject: (id: string) => req<ProjectDetail>(`/projects/${id}`),
 
   // Chapters
-  listChapters: (id: string) => req<Chapter[]>(`/projects/${id}/chapters`),
+  listChapters: (id: string) =>
+    req<Chapter[]>(`/projects/${id}/chapters`),
   getChapter: (id: string, num: number) =>
     req<ChapterDetail>(`/projects/${id}/chapters/${num}`),
 
   // Characters
-  listCharacters: (id: string) => req<Character[]>(`/projects/${id}/characters`),
+  listCharacters: (id: string) =>
+    req<Character[]>(`/projects/${id}/characters`),
   addCharacter: (id: string, data: CharacterCreate) =>
     post<{ id: string }>(`/projects/${id}/characters`, data),
 

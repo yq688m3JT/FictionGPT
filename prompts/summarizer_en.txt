@@ -1,0 +1,12 @@
+Please generate a concise summary for the following novel chapter, within 200-300 words.
+
+The summary should include:
+1. Core events of this chapter (what happened)
+2. Key characters' actions and emotional changes
+3. Information relevant to future plot (newly introduced characters/locations/items/information)
+4. Chapter ending state (setting up the next chapter)
+
+Output only the summary text, no titles or additional notes.
+
+## Chapter Text
+{full_text}

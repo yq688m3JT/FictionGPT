@@ -38,7 +38,9 @@ class Project(Base):
     setting_style_sample = Column(Text)       # 风格样本
     setting_constraints = Column(Text)        # 约束/禁忌
     setting_narrative_person = Column(String, default="第三")
-    narrative_architecture = Column(Text)     # 叙事解构 JSON（里程碑式滚动规划）
+    output_language = Column(String, default="zh") # 项目创作语言：zh / en
+    narrative_architecture = Column(Text)     # 叙事解构 JSON
+    # （里程碑式滚动规划）
     current_milestone = Column(Integer)       # 当前里程碑章节号
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -55,6 +57,7 @@ class Character(Base):
     id = Column(String, primary_key=True, default=_uuid)
     project_id = Column(String, ForeignKey("projects.id"), nullable=False)
     name = Column(String, nullable=False)
+    lang = Column(String, default="zh")       # 语言标识
     aliases = Column(Text)                    # JSON数组
     role = Column(String)                     # 主角/配角/反派/龙套
     personality = Column(Text)
@@ -77,6 +80,7 @@ class Chapter(Base):
     id = Column(String, primary_key=True, default=_uuid)
     project_id = Column(String, ForeignKey("projects.id"), nullable=False)
     chapter_number = Column(Integer, nullable=False)
+    lang = Column(String, default="zh")       # 语言标识
     title = Column(String)
     summary = Column(Text)                    # 自动生成的章节摘要
     full_text = Column(Text)

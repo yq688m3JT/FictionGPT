@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { api } from '../api/client'
 import type { ProjectCreate, CharacterCreate } from '../types'
 
@@ -14,6 +15,7 @@ const EMPTY_CHAR: CharacterCreate = {
 }
 
 export default function NewProject() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -26,6 +28,7 @@ export default function NewProject() {
     constraints: '',
     style_sample: '',
     narrative_person: '第三',
+    language: 'zh',
   })
   const [characters, setCharacters] = useState<CharacterCreate[]>([{ ...EMPTY_CHAR }])
 
@@ -52,7 +55,7 @@ export default function NewProject() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!form.title.trim()) {
-      setError('请填写小说标题')
+      setError(t('error_title_required'))
       return
     }
     setSaving(true)
@@ -72,45 +75,55 @@ export default function NewProject() {
       {/* Header */}
       <header className="border-b border-slate-700 px-8 py-5 flex items-center gap-4">
         <Link to="/" className="text-slate-400 hover:text-white transition-colors text-sm">
-          ← 返回
+          ← {t('back')}
         </Link>
-        <h1 className="text-xl font-bold text-white">新建小说项目</h1>
+        <h1 className="text-xl font-bold text-white">{t('new_project_title')}</h1>
       </header>
 
       <form onSubmit={handleSubmit} className="max-w-2xl mx-auto px-8 py-10 space-y-8">
         {/* 基础信息 */}
         <section>
           <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">
-            基础信息
+            {t('basic_info')}
           </h2>
           <div className="space-y-4">
-            <Field label="小说标题 *">
+            <Field label={`${t('story_title')} *`}>
               <input
                 type="text"
                 value={form.title}
                 onChange={(e) => setField('title', e.target.value)}
-                placeholder="如：苍穹之巅"
+                placeholder={t('title_placeholder')}
                 className={inputCls}
               />
             </Field>
             <div className="grid grid-cols-2 gap-4">
-              <Field label="题材">
+              <Field label={t('genre')}>
                 <input
                   type="text"
                   value={form.genre}
                   onChange={(e) => setField('genre', e.target.value)}
-                  placeholder="如：东方玄幻、科幻、悬疑"
+                  placeholder={t('genre_placeholder')}
                   className={inputCls}
                 />
               </Field>
-              <Field label="叙事人称">
+              <Field label={t('narrative_pov')}>
                 <select
                   value={form.narrative_person}
                   onChange={(e) => setField('narrative_person', e.target.value)}
                   className={inputCls}
                 >
-                  <option value="第三">第三人称</option>
-                  <option value="第一">第一人称</option>
+                  <option value="第三">{t('third_person')}</option>
+                  <option value="第一">{t('first_person')}</option>
+                </select>
+              </Field>
+              <Field label={t('writing_language')}>
+                <select
+                  value={form.language}
+                  onChange={(e) => setField('language', e.target.value)}
+                  className={inputCls}
+                >
+                  <option value="zh">{t('language_zh')}</option>
+                  <option value="en">{t('language_en')}</option>
                 </select>
               </Field>
             </div>
@@ -120,42 +133,42 @@ export default function NewProject() {
         {/* 世界观 */}
         <section>
           <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">
-            世界观与风格
+            {t('worldview_style')}
           </h2>
           <div className="space-y-4">
-            <Field label="世界观设定">
+            <Field label={t('worldview_setting')}>
               <textarea
                 value={form.worldview}
                 onChange={(e) => setField('worldview', e.target.value)}
                 rows={5}
-                placeholder="描述故事发生的世界背景、规则体系、历史背景等..."
+                placeholder={t('worldview_placeholder')}
                 className={inputCls}
               />
             </Field>
-            <Field label="叙事基调">
+            <Field label={t('narrative_tone')}>
               <input
                 type="text"
                 value={form.tone}
                 onChange={(e) => setField('tone', e.target.value)}
-                placeholder="如：热血成长、黑暗压抑、轻松治愈"
+                placeholder={t('tone_placeholder')}
                 className={inputCls}
               />
             </Field>
-            <Field label="禁忌 / 约束（可选）">
+            <Field label={t('constraints')}>
               <input
                 type="text"
                 value={form.constraints}
                 onChange={(e) => setField('constraints', e.target.value)}
-                placeholder="如：不要后宫、不要系统流、不要NTR"
+                placeholder={t('constraints_placeholder')}
                 className={inputCls}
               />
             </Field>
-            <Field label="风格参考样本（可选，粘贴喜欢的文字片段）">
+            <Field label={t('style_sample')}>
               <textarea
                 value={form.style_sample}
                 onChange={(e) => setField('style_sample', e.target.value)}
                 rows={4}
-                placeholder="粘贴一段你喜欢的文字风格，AI 将尝试模仿..."
+                placeholder={t('style_sample_placeholder')}
                 className={inputCls}
               />
             </Field>
@@ -166,14 +179,14 @@ export default function NewProject() {
         <section>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">
-              角色设定
+              {t('character_settings')}
             </h2>
             <button
               type="button"
               onClick={addChar}
               className="text-sm text-blue-400 hover:text-blue-300 transition-colors"
             >
-              + 添加角色
+              + {t('add_character')}
             </button>
           </div>
           <div className="space-y-4">
@@ -184,7 +197,7 @@ export default function NewProject() {
               >
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium text-slate-300">
-                    角色 {i + 1}
+                    {t('character')} {i + 1}
                   </span>
                   {characters.length > 1 && (
                     <button
@@ -192,57 +205,57 @@ export default function NewProject() {
                       onClick={() => removeChar(i)}
                       className="text-xs text-slate-500 hover:text-red-400 transition-colors"
                     >
-                      删除
+                      {t('delete')}
                     </button>
                   )}
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  <Field label="姓名">
+                  <Field label={t('name')}>
                     <input
                       type="text"
                       value={char.name}
                       onChange={(e) => setChar(i, 'name', e.target.value)}
-                      placeholder="角色名字"
+                      placeholder={t('name_placeholder')}
                       className={inputCls}
                     />
                   </Field>
-                  <Field label="定位">
+                  <Field label={t('role')}>
                     <select
                       value={char.role}
                       onChange={(e) => setChar(i, 'role', e.target.value)}
                       className={inputCls}
                     >
-                      <option value="主角">主角</option>
-                      <option value="配角">配角</option>
-                      <option value="反派">反派</option>
-                      <option value="龙套">龙套</option>
+                      <option value="主角">{t('protagonist')}</option>
+                      <option value="配角">{t('supporting')}</option>
+                      <option value="反派">{t('antagonist')}</option>
+                      <option value="龙套">{t('extra')}</option>
                     </select>
                   </Field>
                 </div>
-                <Field label="性格">
+                <Field label={t('personality')}>
                   <input
                     type="text"
                     value={char.personality}
                     onChange={(e) => setChar(i, 'personality', e.target.value)}
-                    placeholder="性格特点..."
+                    placeholder={t('personality_placeholder')}
                     className={inputCls}
                   />
                 </Field>
-                <Field label="背景故事">
+                <Field label={t('backstory')}>
                   <textarea
                     value={char.background}
                     onChange={(e) => setChar(i, 'background', e.target.value)}
                     rows={2}
-                    placeholder="身世背景..."
+                    placeholder={t('backstory_placeholder')}
                     className={inputCls}
                   />
                 </Field>
-                <Field label="说话风格（可选）">
+                <Field label={t('speech_style')}>
                   <input
                     type="text"
                     value={char.speech_style}
                     onChange={(e) => setChar(i, 'speech_style', e.target.value)}
-                    placeholder="如：言简意赅、喜欢引用诗词"
+                    placeholder={t('speech_style_placeholder')}
                     className={inputCls}
                   />
                 </Field>
@@ -263,13 +276,13 @@ export default function NewProject() {
             disabled={saving}
             className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
           >
-            {saving ? '创建中...' : '创建项目并开始写作'}
+            {saving ? t('creating') : t('create_and_start')}
           </button>
           <Link
             to="/"
             className="px-6 py-3 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg font-medium transition-colors text-center"
           >
-            取消
+            {t('cancel')}
           </Link>
         </div>
       </form>

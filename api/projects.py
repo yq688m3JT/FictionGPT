@@ -68,6 +68,7 @@ class ProjectCreate(BaseModel):
     constraints: str = ""
     style_sample: str = ""
     narrative_person: str = "第三"
+    language: str = "zh"
     characters: list[CharacterIn] = []
 
 
@@ -92,6 +93,7 @@ async def create_project(data: ProjectCreate, request: Request):
         style_sample=data.style_sample,
         narrative_person=data.narrative_person,
         project_id=project_id,
+        language=data.language,
     )
     for char in data.characters:
         db.create_character(project_id, **char.model_dump())
@@ -113,6 +115,7 @@ async def get_project(project_id: str, request: Request):
         "tone": p.setting_tone or "",
         "constraints": p.setting_constraints or "",
         "narrative_person": p.setting_narrative_person or "第三",
+        "language": p.output_language or "zh",
         "chapter_count": db.get_chapter_count(project_id),
         "created_at": p.created_at.isoformat() if p.created_at else "",
     }

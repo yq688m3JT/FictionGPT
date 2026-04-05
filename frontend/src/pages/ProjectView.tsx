@@ -1,17 +1,29 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { api } from '../api/client'
 import { useGeneration } from '../hooks/useGeneration'
-import type { Chapter, ChapterDetail, Character, ProjectDetail } from '../types'
+import type { Chapter, ChapterDetail, Character } from '../types'
 
 export default function ProjectView() {
   const { id } = useParams<{ id: string }>()
-  const [project, setProject] = useState<ProjectDetail | null>(null)
+  const { t } = useTranslation()
+
   const [chapters, setChapters] = useState<Chapter[]>([])
   const [characters, setCharacters] = useState<Character[]>([])
   const [selectedChapter, setSelectedChapter] = useState<number | null>(null)
   const [chapterDetail, setChapterDetail] = useState<ChapterDetail | null>(null)
   const [loadingChapter, setLoadingChapter] = useState(false)
+
+  const { status, stage, streamBuffer, start, cancel } = useGeneration(id || '', {
+    onChapterComplete: () => {
+      loadChapters().then((data) => {
+        if (data && data.length > 0) {
+          setSelectedChapter(data[data.length - 1].number)
+        }
+      })
+    },
+  })
 
   const loadChapters = useCallback(async () => {
     if (!id) return
@@ -20,28 +32,13 @@ export default function ProjectView() {
     return data
   }, [id])
 
-  const { status, stage, streamBuffer, start, cancel } = useGeneration(id ?? '', {
-    onChapterComplete: async (msg) => {
-      const data = await loadChapters()
-      const num = msg.chapter_number ?? (data?.length ?? 0)
-      setSelectedChapter(num)
-      // 直接用流式缓冲作为章节文本，避免多一次 API 请求
-      setChapterDetail({
-        number: num,
-        title: msg.title ?? '',
-        full_text: streamBuffer,
-        summary: msg.summary ?? '',
-        word_count: msg.word_count ?? streamBuffer.length,
-      })
-    },
-  })
-
   // 初始加载
   useEffect(() => {
     if (!id) return
-    api.getProject(id).then(setProject).catch(() => {})
     loadChapters().then((data) => {
-      if (data && data.length > 0) setSelectedChapter(data[data.length - 1].number)
+      if (data && data.length > 0 && selectedChapter === null) {
+        setSelectedChapter(data[data.length - 1].number)
+      }
     })
     api.listCharacters(id).then(setCharacters).catch(() => {})
   }, [id, loadChapters])
@@ -49,37 +46,41 @@ export default function ProjectView() {
   // 加载所选章节正文
   useEffect(() => {
     if (!id || selectedChapter === null || status === 'generating') return
+    
+    setChapterDetail(null) 
     setLoadingChapter(true)
+    
     api
       .getChapter(id, selectedChapter)
       .then(setChapterDetail)
-      .catch(() => {})
+      .catch((err) => {
+        console.error("Failed to fetch chapter:", err)
+      })
       .finally(() => setLoadingChapter(false))
   }, [id, selectedChapter, status])
 
   const isGenerating = status === 'generating'
 
   return (
-    <div className="flex h-screen overflow-hidden bg-slate-900 text-slate-100">
+    <div className="flex h-[calc(100vh-64px)] overflow-hidden bg-slate-950 text-slate-100">
       {/* ── 左侧：章节目录 ── */}
-      <aside className="w-52 flex-shrink-0 bg-slate-800 border-r border-slate-700 flex flex-col">
-        <div className="px-4 py-3 border-b border-slate-700 flex items-center gap-2">
-          <Link
-            to="/"
-            className="text-slate-500 hover:text-slate-300 transition-colors text-xs"
-            title="返回主页"
-          >
-            ←
-          </Link>
-          <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">
-            章节目录
+      <aside className="w-64 flex-shrink-0 bg-slate-900/50 border-r border-slate-800 flex flex-col">
+        <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-900">
+          <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">
+            {t('chapters', '章节目录')}
+          </span>
+          <span className="text-[10px] bg-slate-800 px-2 py-0.5 rounded text-slate-400 font-mono">
+            {chapters.length}
           </span>
         </div>
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto custom-scrollbar">
           {chapters.length === 0 && (
-            <p className="text-xs text-slate-600 text-center mt-8 px-4">
-              还没有章节，点击右侧「生成」开始
-            </p>
+            <div className="px-6 py-12 text-center">
+              <div className="text-3xl mb-4 opacity-20">✍️</div>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                {t('no_chapters_hint')}
+              </p>
+            </div>
           )}
           {chapters.map((ch) => (
             <button
@@ -87,210 +88,202 @@ export default function ProjectView() {
               onClick={() => {
                 if (!isGenerating) setSelectedChapter(ch.number)
               }}
-              className={`w-full text-left px-4 py-3 border-b border-slate-700/40 transition-colors ${
+              className={`w-full text-left px-6 py-4 border-b border-slate-800/50 transition-all group ${
                 selectedChapter === ch.number && !isGenerating
-                  ? 'bg-blue-600/20 text-blue-300'
-                  : 'text-slate-400 hover:bg-slate-700/50 hover:text-slate-200'
+                  ? 'bg-indigo-600/10 border-r-4 border-r-indigo-500'
+                  : 'hover:bg-slate-800/50'
               }`}
             >
-              <div className="text-xs font-medium">第 {ch.number} 章</div>
-              <div className="text-xs text-slate-500 truncate mt-0.5">{ch.title || '—'}</div>
-              <div className="text-xs text-slate-600 mt-0.5">{ch.word_count.toLocaleString()} 字</div>
+              <div className={`text-[10px] font-bold mb-1 uppercase tracking-tighter ${
+                selectedChapter === ch.number ? 'text-indigo-400' : 'text-slate-500'
+              }`}>
+                {t('chapter')} {ch.number} {t('chapter_unit')}
+              </div>
+              <div className={`text-sm font-semibold truncate transition-colors ${
+                selectedChapter === ch.number ? 'text-white' : 'text-slate-400 group-hover:text-slate-200'
+              }`}>
+                {ch.title || '未命名章节'}
+              </div>
+              <div className="text-[10px] text-slate-600 mt-2 font-medium">
+                {ch.word_count.toLocaleString()} {t('words')}
+              </div>
             </button>
           ))}
         </div>
       </aside>
 
       {/* ── 中间：阅读区 ── */}
-      <main className="flex-1 flex flex-col overflow-hidden">
-        {/* 顶栏 */}
-        <div className="h-12 bg-slate-800 border-b border-slate-700 flex items-center px-6 gap-3 flex-shrink-0">
-          <h1 className="font-semibold text-sm truncate">{project?.title ?? '加载中...'}</h1>
-          {project?.genre && (
-            <span className="text-xs text-slate-500 bg-slate-700 px-2 py-0.5 rounded-full">
-              {project.genre}
-            </span>
-          )}
-          <span className="text-xs text-slate-500 ml-auto">
-            {project?.narrative_person}人称 · 共 {chapters.length} 章
-          </span>
-        </div>
-
-        {/* 内容 */}
+      <main className="flex-1 flex flex-col overflow-hidden bg-slate-950">
         <ReaderArea
           isGenerating={isGenerating}
           stage={stage}
           streamBuffer={streamBuffer}
           chapter={isGenerating ? null : chapterDetail}
           loading={loadingChapter}
+          t={t}
         />
       </main>
 
       {/* ── 右侧：控制 + 信息 ── */}
-      <aside className="w-72 flex-shrink-0 bg-slate-800 border-l border-slate-700 flex flex-col overflow-hidden">
-        {/* 生成控制 */}
+      <aside className="w-80 flex-shrink-0 bg-slate-900/50 border-l border-slate-800 flex flex-col overflow-hidden">
         <GenerationPanel
           status={status}
           stage={stage}
           chapterCount={chapters.length}
           onStart={start}
           onCancel={cancel}
+          t={t}
         />
 
-        {/* 角色状态 */}
-        <div className="flex-1 overflow-y-auto">
-          <CharacterPanel characters={characters} />
+        <div className="flex-1 overflow-y-auto custom-scrollbar">
+          <CharacterPanel characters={characters} t={t} />
         </div>
       </aside>
     </div>
   )
 }
 
-// ─────────────────────────────────────────────────────────────────────
-// 阅读区
-// ─────────────────────────────────────────────────────────────────────
-
-interface ReaderAreaProps {
-  isGenerating: boolean
-  stage: string
-  streamBuffer: string
-  chapter: ChapterDetail | null
-  loading: boolean
-}
-
-function ReaderArea({ isGenerating, stage, streamBuffer, chapter, loading }: ReaderAreaProps) {
+function ReaderArea({ isGenerating, stage, streamBuffer, chapter, loading, t }: any) {
   const bottomRef = useRef<HTMLDivElement>(null)
 
-  // 流式生成时自动滚动到底部
   useEffect(() => {
     if (isGenerating) bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [streamBuffer, isGenerating])
 
   return (
-    <div className="flex-1 overflow-y-auto">
-      <div className="max-w-2xl mx-auto px-8 py-10">
-        {/* 生成中：显示阶段提示 + 流式文本 */}
+    <div className="flex-1 overflow-y-auto custom-scrollbar bg-[radial-gradient(circle_at_top,_var(--tw-gradient-stops))] from-indigo-500/5 via-transparent to-transparent">
+      <div className="max-w-3xl mx-auto px-12 py-16">
         {isGenerating && (
-          <>
-            <div className="flex items-center gap-2 mb-6 text-blue-400 text-sm">
-              <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
-              {stage || '生成中...'}
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
+            <div className="flex items-center gap-3 mb-12 bg-indigo-500/10 w-fit px-4 py-2 rounded-full border border-indigo-500/20">
+              <span className="flex h-2 w-2 relative">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+              </span>
+              <span className="text-xs font-bold text-indigo-400 uppercase tracking-widest">{stage || t('generating')}</span>
             </div>
             {streamBuffer.length > 0 && (
-              <div className={`prose-novel ${streamBuffer.length > 0 ? 'cursor-blink' : ''}`}>
-                {streamBuffer.split('\n').map((line, i) =>
+              <div className="prose-novel space-y-6">
+                {streamBuffer.split('\n').map((line: string, i: number) =>
                   line.trim() ? (
-                    <p key={i} className="text-slate-200 leading-8 mb-4 indent-8">
+                    <p key={i} className="text-slate-300 text-lg leading-relaxed indent-8 selection:bg-indigo-500/30">
                       {line}
                     </p>
                   ) : null,
                 )}
               </div>
             )}
-          </>
+          </div>
         )}
 
-        {/* 未生成时：显示已选章节 */}
         {!isGenerating && loading && (
-          <div className="text-center text-slate-600 py-20 text-sm">加载中...</div>
+          <div className="flex flex-col items-center justify-center py-32 opacity-40">
+            <div className="w-12 h-12 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin mb-6"></div>
+            <p className="text-sm font-medium tracking-widest text-slate-500 uppercase">{t('translating_or_loading')}</p>
+          </div>
         )}
 
         {!isGenerating && !loading && !chapter && (
-          <div className="text-center text-slate-600 py-20 text-sm">
-            从左侧选择章节，或点击右侧「生成」创作新章节
+          <div className="flex flex-col items-center justify-center py-48 text-center opacity-20">
+            <div className="text-6xl mb-8">📖</div>
+            <p className="text-xl font-medium max-w-xs leading-relaxed">
+              {t('select_chapter_hint')}
+            </p>
           </div>
         )}
 
         {!isGenerating && !loading && chapter && (
-          <>
-            <div className="text-center mb-10">
-              <div className="text-slate-500 text-sm mb-1">第 {chapter.number} 章</div>
-              <h2 className="text-2xl font-bold text-white">{chapter.title}</h2>
-              <div className="text-xs text-slate-600 mt-2">
-                {chapter.word_count.toLocaleString()} 字
+          <div className="animate-in fade-in duration-1000">
+            <header className="text-center mb-16 relative">
+              <div className="absolute -top-8 left-1/2 -translate-x-1/2 text-8xl font-black text-slate-800/10 pointer-events-none">
+                {chapter.number}
               </div>
-            </div>
-            <div className="prose-novel">
-              {chapter.full_text.split('\n').map((line, i) =>
+              <div className="text-indigo-500 text-xs font-black uppercase tracking-[0.3em] mb-4">
+                {t('chapter')} {chapter.number} {t('chapter_unit')}
+              </div>
+              <h2 className="text-4xl font-extrabold text-white tracking-tight leading-tight mb-6">
+                {chapter.title}
+              </h2>
+              <div className="w-12 h-1 bg-indigo-600 mx-auto rounded-full mb-6"></div>
+              <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                {chapter.word_count.toLocaleString()} {t('words')}
+              </div>
+            </header>
+            
+            <div className="prose-novel space-y-8">
+              {chapter.full_text.split('\n').map((line: string, i: number) =>
                 line.trim() ? (
-                  <p key={i} className="text-slate-200 leading-8 mb-4 indent-8">
+                  <p key={i} className="text-slate-300 text-lg leading-relaxed indent-8 selection:bg-indigo-500/30">
                     {line}
                   </p>
                 ) : null,
               )}
             </div>
+
             {chapter.summary && (
-              <div className="mt-10 pt-6 border-t border-slate-700">
-                <div className="text-xs text-slate-500 mb-2">本章摘要</div>
-                <p className="text-sm text-slate-400 leading-7">{chapter.summary}</p>
+              <div className="mt-20 p-8 bg-slate-900/50 rounded-3xl border border-slate-800 shadow-inner">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-1.5 h-1.5 rounded-full bg-indigo-500"></div>
+                  <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('summary')}</div>
+                </div>
+                <p className="text-sm text-slate-400 leading-relaxed italic">{chapter.summary}</p>
               </div>
             )}
-          </>
+          </div>
         )}
 
-        <div ref={bottomRef} />
+        <div ref={bottomRef} className="h-24" />
       </div>
     </div>
   )
 }
 
-// ─────────────────────────────────────────────────────────────────────
-// 生成控制面板
-// ─────────────────────────────────────────────────────────────────────
-
-interface GenerationPanelProps {
-  status: 'idle' | 'generating' | 'error'
-  stage: string
-  chapterCount: number
-  onStart: () => void
-  onCancel: () => void
-}
-
-function GenerationPanel({ status, stage, chapterCount, onStart, onCancel }: GenerationPanelProps) {
+function GenerationPanel({ status, stage, chapterCount, onStart, onCancel, t }: any) {
   return (
-    <div className="p-4 border-b border-slate-700 flex-shrink-0">
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">
-          生成控制
+    <div className="p-8 border-b border-slate-800 bg-slate-900">
+      <div className="flex items-center justify-between mb-6">
+        <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">
+          {t('generation_control')}
         </span>
-        <span className="text-xs text-slate-600">共 {chapterCount} 章</span>
+        <span className="text-[10px] font-mono text-slate-600 px-2 py-0.5 bg-slate-800 rounded">
+          VOL. {chapterCount}
+        </span>
       </div>
 
       {status === 'idle' && (
         <button
           onClick={onStart}
-          className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
+          className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl text-sm font-bold shadow-lg shadow-indigo-600/20 transition-all transform hover:scale-[1.02] active:scale-[0.98]"
         >
-          生成第 {chapterCount + 1} 章
+          {t('write_next_chapter')}
         </button>
       )}
 
       {status === 'generating' && (
-        <div className="space-y-3">
-          <div className="flex items-start gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse mt-1.5 flex-shrink-0" />
-            <p className="text-xs text-blue-300 leading-5">{stage || '生成中...'}</p>
-          </div>
-          <div className="w-full bg-slate-700 rounded-full h-1 overflow-hidden">
-            <div className="h-full bg-blue-500 rounded-full animate-[progress_3s_ease-in-out_infinite]" />
+        <div className="space-y-4">
+          <div className="flex items-start gap-3 p-4 bg-indigo-500/5 rounded-2xl border border-indigo-500/10">
+            <span className="w-2 h-2 rounded-full bg-indigo-500 animate-ping mt-1.5 flex-shrink-0" />
+            <p className="text-xs text-indigo-300 font-medium leading-relaxed">{stage || t('generating')}</p>
           </div>
           <button
             onClick={onCancel}
-            className="w-full py-2 bg-slate-700 hover:bg-slate-600 text-slate-400 rounded-lg text-sm transition-colors"
+            className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded-2xl text-xs font-bold transition-all"
           >
-            取消
+            {t('cancel')}
           </button>
         </div>
       )}
 
       {status === 'error' && (
-        <div className="space-y-3">
-          <p className="text-xs text-red-400 leading-5">{stage}</p>
+        <div className="space-y-4">
+          <div className="p-4 bg-red-500/10 rounded-2xl border border-red-500/20">
+            <p className="text-xs text-red-400 font-medium leading-relaxed">{stage}</p>
+          </div>
           <button
             onClick={onStart}
-            className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
+            className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl text-sm font-bold shadow-lg shadow-indigo-600/20 transition-all"
           >
-            重试
+            {t('retry')}
           </button>
         </div>
       )}
@@ -298,54 +291,50 @@ function GenerationPanel({ status, stage, chapterCount, onStart, onCancel }: Gen
   )
 }
 
-// ─────────────────────────────────────────────────────────────────────
-// 角色面板
-// ─────────────────────────────────────────────────────────────────────
-
-function CharacterPanel({ characters }: { characters: Character[] }) {
+function CharacterPanel({ characters, t }: { characters: Character[], t: any }) {
   const [open, setOpen] = useState(true)
 
   if (characters.length === 0) return null
 
   return (
-    <div className="border-b border-slate-700">
+    <div className="border-b border-slate-800">
       <button
         onClick={() => setOpen((o) => !o)}
-        className="w-full px-4 py-3 flex items-center justify-between text-xs font-semibold text-slate-400 uppercase tracking-wide hover:bg-slate-700/30 transition-colors"
+        className="w-full px-8 py-4 flex items-center justify-between hover:bg-slate-800/30 transition-all"
       >
-        <span>角色 ({characters.length})</span>
-        <span className="text-slate-600">{open ? '▲' : '▼'}</span>
+        <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">
+          {t('characters')} ({characters.length})
+        </span>
+        <span className={`text-slate-600 text-[10px] transition-transform duration-300 ${open ? 'rotate-180' : ''}`}>
+          ▼
+        </span>
       </button>
       {open && (
-        <div className="px-4 pb-3 space-y-2.5">
+        <div className="px-6 pb-8 space-y-4">
           {characters.map((c) => (
-            <div key={c.id} className="bg-slate-900/50 rounded-lg p-3">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="font-medium text-sm text-slate-200">{c.name}</span>
+            <div key={c.id} className="bg-slate-900 border border-slate-800 rounded-2xl p-4 hover:border-indigo-500/30 transition-colors group">
+              <div className="flex items-center justify-between mb-3">
+                <span className="font-bold text-sm text-white group-hover:text-indigo-400 transition-colors">{c.name}</span>
                 <span
-                  className={`text-xs px-1.5 py-0.5 rounded ${
-                    c.role === '主角'
-                      ? 'bg-yellow-900/40 text-yellow-400'
-                      : c.role === '反派'
-                        ? 'bg-red-900/40 text-red-400'
-                        : 'bg-slate-700 text-slate-400'
+                  className={`text-[9px] px-2 py-0.5 rounded-full font-black uppercase tracking-tighter ${
+                    c.role === '主角' || c.role === 'Protagonist'
+                      ? 'bg-indigo-500/10 text-indigo-400'
+                      : 'bg-slate-800 text-slate-500'
                   }`}
                 >
                   {c.role}
                 </span>
-                {!c.is_alive && (
-                  <span className="text-xs text-slate-600">(已亡)</span>
-                )}
               </div>
               {c.personality && (
-                <p className="text-xs text-slate-500 leading-5">{c.personality}</p>
+                <p className="text-xs text-slate-500 leading-relaxed mb-4 line-clamp-3 italic">"{c.personality}"</p>
               )}
               {Object.keys(c.current_state).length > 0 && (
-                <div className="mt-1.5 flex flex-wrap gap-1">
+                <div className="flex flex-wrap gap-2">
                   {Object.entries(c.current_state).map(([k, v]) => (
-                    <span key={k} className="text-xs text-slate-600 bg-slate-800 rounded px-1.5 py-0.5">
-                      {k}：{v}
-                    </span>
+                    <div key={k} className="flex flex-col bg-slate-800/50 rounded-lg px-2 py-1.5 border border-slate-800 min-w-[60px]">
+                      <span className="text-[8px] font-black text-slate-600 uppercase mb-0.5">{k}</span>
+                      <span className="text-[10px] font-bold text-slate-400 truncate">{v as string}</span>
+                    </div>
                   ))}
                 </div>
               )}
@@ -356,5 +345,3 @@ function CharacterPanel({ characters }: { characters: Character[] }) {
     </div>
   )
 }
-
-
