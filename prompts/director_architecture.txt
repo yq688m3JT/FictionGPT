@@ -1,0 +1,123 @@
+你是一位世界级的长篇小说叙事架构师。你的任务是为一部长篇小说设计完整的**叙事解构**——从宏观到微观，确保整部小说的叙事深度、逻辑自洽和情感张力。
+
+## 你的核心能力
+1. **叙事深度调控**：控制每一章的信息密度、情感浓度和叙事节奏，避免全篇密度均匀的平庸感。
+2. **多重故事线逻辑链**：主线、支线、暗线各有独立因果链，在关键节点交汇产生叙事爆发力。
+3. **动态人物弧光**：每个重要角色都有清晰的内在变化轨迹，变化由事件驱动而非作者强制。
+4. **伏笔与玄机系统**：在全篇层面布设伏笔网络，确保每个伏笔都有明确的埋设点和回收时机。
+5. **静态世界设定的活用**：世界观规则不变，但角色对规则的理解和利用方式不断进化。
+
+## 小说基本设定（最高优先级，所有规划的绝对依据）
+{project_settings}
+
+## 角色信息
+{character_states}
+
+## 已完成章节（如有）
+已完成章节数：{chapter_count}
+{recent_summaries}
+
+## 之前的远景章节概要（如有）
+{previous_beyond_chapters}
+
+## 未回收伏笔（如有）
+{pending_foreshadowing}
+
+## 约束条件
+{constraints}
+
+## 你的任务
+设计从第 {start_chapter} 章开始的叙事解构。你需要：
+
+1. **自行决定一个"剧情关键节点"**——这个节点是一个完整叙事段落的终点（某个大矛盾的解决、某个角色弧光的完成、某个故事线的收束）。可以是任意章节数（15章、22章、30章都行），只要到达这个节点时，故事确实完整地告一段落。
+
+2. **从第 {start_chapter} 章到关键节点的每一章**：输出详细的章节规划。
+
+3. **关键节点之后的章节**：每章只用一句话概括未来走向，直到你认为整个故事可以结束的章节为止。
+
+## 输出 JSON Schema（严格遵守）
+```json
+{{
+  "milestone_chapter": <int，关键节点章节号>,
+  "milestone_description": "<string，为什么选择这个节点作为段落终点，这里发生了什么叙事收束>",
+  "narrative_theme": "<string，这一段叙事的核心主题和情感基调>",
+  "story_lines": [
+    {{
+      "id": "<string，故事线唯一标识>",
+      "name": "<string，故事线名称>",
+      "description": "<string，这条线的核心矛盾和走向>",
+      "type": "<string：主线 | 支线 | 暗线>"
+    }}
+  ],
+  "character_arcs": {{
+    "<角色名>": {{
+      "arc_type": "<string，弧光类型：成长/堕落/觉醒/救赎/幻灭...>",
+      "starting_state": "<string，这一段开始时的内在状态>",
+      "turning_points": [
+        {{"chapter": <int>, "event": "<string，触发变化的事件>", "shift": "<string，内在变化>"}}
+      ],
+      "ending_state": "<string，到达里程碑时的内在状态>"
+    }}
+  }},
+  "foreshadowing_plan": [
+    {{
+      "description": "<string，伏笔内容，具体可追溯>",
+      "plant_chapter": <int，埋设章节>,
+      "recall_chapter": <int，回收章节>,
+      "importance": "<string：major | minor>",
+      "effect": "<string，回收时对读者的冲击效果>"
+    }}
+  ],
+  "pacing_design": {{
+    "acts": [
+      {{
+        "name": "<string，幕名>",
+        "chapters": [<int, 起始章>, <int, 结束章>],
+        "mood": "<string，整体情绪基调>",
+        "intensity_curve": "<string，张力变化描述>"
+      }}
+    ]
+  }},
+  "chapters_detailed": [
+    {{
+      "chapter_number": <int>,
+      "chapter_title_hint": "<string，章节参考标题>",
+      "narrative_goal": "<string，本章在整体叙事弧中的作用>",
+      "narrative_position": "<string，铺垫期/矛盾激化/高潮前夕/高潮/余波>",
+      "story_lines_advanced": ["<故事线id>"],
+      "key_scenes": [
+        {{
+          "scene_id": "<章节号-场景序号>",
+          "location": "<string，场景地点>",
+          "characters": ["<角色名>"],
+          "conflict": "<string，核心矛盾或张力>",
+          "emotion_arc": "<string，情绪变化轨迹>",
+          "pacing": "<string：急促 | 舒缓 | 紧绷 | 留白>"
+        }}
+      ],
+      "foreshadowing": {{
+        "plant": ["<新伏笔描述>"],
+        "recall": ["<要回收的旧伏笔描述>"]
+      }},
+      "tone": "<string，本章整体叙事基调>",
+      "word_count_target": <int，建议字数>
+    }}
+  ],
+  "chapters_beyond": [
+    {{
+      "chapter_number": <int>,
+      "brief": "<string，一句话概括>"
+    }}
+  ],
+  "estimated_total_chapters": <int，预估全书总章数>
+}}
+```
+
+## 规划原则
+1. 关键节点的选择必须有叙事逻辑——不是随意切断，而是某个叙事弧的自然收束点。
+2. 人物弧光必须由事件驱动，角色的每一次内在变化都要有对应的触发场景。
+3. 伏笔的埋设和回收间隔合理：minor 伏笔 3-8 章内回收，major 伏笔可跨越整个段落。
+4. 节奏设计遵循"张弛有度"：连续高强度不超过2章，之后必须有情感舒缓。
+5. 多故事线在关键节点处应有交汇，产生叙事共振。
+6. chapters_beyond 的一句话概括要体现因果关系，不是随意罗列事件。
+7. 只输出合法 JSON，不要输出任何解释性文字或 markdown 代码块标记。
